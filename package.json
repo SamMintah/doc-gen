@@ -1,0 +1,79 @@
+{
+  "name": "api-doc-generator",
+  "version": "1.1.0",
+  "description": "AI-powered CLI tool for generating comprehensive API documentation from live APIs and code",
+  "type": "module",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "api-doc-generator": "dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "ts-node --esm src/cli/index.ts",
+    "build": "tsup src/cli/index.ts --format esm --target node18 --clean",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "format:check": "prettier --check src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "api",
+    "documentation",
+    "cli",
+    "openai",
+    "rest",
+    "graphql",
+    "markdown",
+    "slate",
+    "typescript"
+  ],
+  "author": "Traycer.AI",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "axios": "^1.6.2",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "graphql": "^16.8.1",
+    "graphql-request": "^6.1.0",
+    "inquirer": "^9.2.12",
+    "jsonschema": "^1.4.1",
+    "openai": "^4.20.1",
+    "validator": "^13.11.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.10.0",
+    "@types/validator": "^13.11.7",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "@vitest/coverage-v8": "^1.0.4",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.1.0",
+    "ts-node": "^10.9.1",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2",
+    "vitest": "^1.0.4"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/traycerai/api-doc-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/traycerai/api-doc-generator/issues"
+  },
+  "homepage": "https://github.com/traycerai/api-doc-generator#readme"
+}
