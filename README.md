@@ -1,7 +1,6 @@
 # API Documentation Generator
 
 [![npm version](https://badge.fury.io/js/api-doc-generator.svg)](https://badge.fury.io/js/api-doc-generator)
-[![Build Status](https://github.com/traycerai/api-doc-generator/workflows/CI/badge.svg)](https://github.com/traycerai/api-doc-generator/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 
