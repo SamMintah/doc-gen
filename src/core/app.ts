@@ -174,8 +174,12 @@ async function validateConfiguration(config: Config): Promise<void> {
     throw new ConfigurationError('Output file path is required');
   }
 
-  if (!config.openaiApiKey) {
-    throw new ConfigurationError('OpenAI API key is required');
+  if (!config.provider) {
+    throw new ConfigurationError('LLM provider is required');
+  }
+
+  if (!config.providerConfig || !config.providerConfig.apiKey) {
+    throw new ConfigurationError('LLM API key is required');
   }
 
   // Validate mode-specific requirements
@@ -191,9 +195,10 @@ async function validateConfiguration(config: Config): Promise<void> {
     throw new ConfigurationError(`Cannot create output directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
-  // Validate OpenAI API key format
-  if (!config.openaiApiKey.startsWith('sk-')) {
-    throw new ConfigurationError('OpenAI API key appears to be invalid (should start with "sk-")');
+  // Provider-agnostic API key validation - just check it's not empty
+  const apiKey = config.providerConfig.apiKey;
+  if (!apiKey || apiKey.trim() === '') {
+    throw new ConfigurationError(`API key for ${config.provider} provider cannot be empty`);
   }
 }
 
@@ -274,7 +279,7 @@ async function initializeAIService(config: Config): Promise<AIService> {
     // Validate AI service connection
     const isValid = await aiService.validateService();
     if (!isValid) {
-      throw new AIProcessingError('Failed to connect to OpenAI API. Please check your API key and internet connection.');
+      throw new AIProcessingError(`Failed to connect to ${config.provider} API. Please check your API key and internet connection.`);
     }
 
     return aiService;
@@ -297,7 +302,7 @@ async function generateAIDocumentation(
   try {
     // Check if we're approaching token limits before starting
     if (aiService.isApproachingTokenLimit()) {
-      console.warn('[App] Warning: Approaching OpenAI token limits. Consider processing fewer endpoints or using a different model.');
+      console.warn('[App] Warning: Approaching LLM token limits. Consider processing fewer endpoints or using a different model.');
     }
 
     const enhancedApiSpec = await aiService.generateDocumentation(
@@ -320,7 +325,7 @@ async function generateAIDocumentation(
         throw new AIProcessingError(`Rate limit exceeded: ${error.message}. Please wait and try again later.`);
       }
       if (error.message.includes('API key')) {
-        throw new AIProcessingError(`API key error: ${error.message}. Please check your OpenAI API key.`);
+        throw new AIProcessingError(`API key error: ${error.message}. Please check your LLM API key.`);
       }
     }
 
@@ -465,11 +470,12 @@ export async function getHealthStatus(config: Config): Promise<{
     message: deps.valid ? undefined : `Missing: ${deps.missing.join(', ')}`,
   });
 
-  // Check OpenAI API key
+  // Check LLM API key
+  const apiKey = config.providerConfig?.apiKey;
   checks.push({
-    name: 'OpenAI API Key',
-    status: config.openaiApiKey && config.openaiApiKey.startsWith('sk-') ? 'pass' : 'fail',
-    message: !config.openaiApiKey ? 'Not provided' : !config.openaiApiKey.startsWith('sk-') ? 'Invalid format' : undefined,
+    name: 'LLM API Key',
+    status: apiKey && apiKey.trim() !== '' ? 'pass' : 'fail',
+    message: !apiKey ? 'Not provided' : apiKey.trim() === '' ? 'Empty key' : undefined,
   });
 
   // Check output directory

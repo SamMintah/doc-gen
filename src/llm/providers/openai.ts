@@ -1,23 +1,23 @@
 import OpenAI from 'openai';
-import { Config } from '../models/config.js';
+import { 
+  LLMClient, 
+  LLMResponse, 
+  TokenUsage, 
+  LLMClientError, 
+  LLMRateLimitError, 
+  LLMAuthenticationError, 
+  LLMServerError,
+  LLMProvider 
+} from '../interfaces.js';
 
 /**
- * Supported OpenAI models for documentation generation
+ * OpenAI model mappings
  */
-export enum OpenAIModel {
-  GPT_4 = 'gpt-4',
-  GPT_4_TURBO = 'gpt-4-turbo-preview',
-  GPT_3_5_TURBO = 'gpt-3.5-turbo',
-}
-
-/**
- * OpenAI API response interface
- */
-export interface OpenAIResponse {
-  content: string;
-  tokensUsed: number;
-  model: string;
-}
+export const OpenAIModels = {
+  GPT_4: 'gpt-4',
+  GPT_4_TURBO: 'gpt-4-turbo-preview',
+  GPT_3_5_TURBO: 'gpt-3.5-turbo',
+} as const;
 
 /**
  * Rate limiting configuration
@@ -30,42 +30,23 @@ interface RateLimitConfig {
 }
 
 /**
- * Token usage tracking
+ * OpenAI provider configuration
  */
-interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
+export interface OpenAIConfig {
+  apiKey: string;
+  baseUrl?: string;
+  timeout?: number;
+  maxRetries?: number;
+  temperature?: number;
+  maxTokens?: number;
+  debug?: boolean;
+  verbose?: boolean;
 }
 
 /**
- * OpenAI client error types
+ * OpenAI provider implementation of the LLMClient interface
  */
-export class OpenAIClientError extends Error {
-  constructor(message: string, public readonly code?: string) {
-    super(message);
-    this.name = 'OpenAIClientError';
-  }
-}
-
-export class OpenAIRateLimitError extends OpenAIClientError {
-  constructor(message: string, public readonly retryAfter?: number) {
-    super(message, 'RATE_LIMIT');
-    this.name = 'OpenAIRateLimitError';
-  }
-}
-
-export class OpenAIAuthenticationError extends OpenAIClientError {
-  constructor(message: string) {
-    super(message, 'AUTHENTICATION');
-    this.name = 'OpenAIAuthenticationError';
-  }
-}
-
-/**
- * OpenAI client wrapper with rate limiting, error handling, and retry logic
- */
-export class OpenAIClient {
+export class OpenAIProvider implements LLMClient {
   private client: OpenAI;
   private rateLimitConfig: RateLimitConfig;
   private requestQueue: Array<() => Promise<void>> = [];
@@ -77,17 +58,19 @@ export class OpenAIClient {
     totalTokens: 0,
   };
 
-  constructor(private config: Config) {
+  constructor(private config: OpenAIConfig) {
     this.validateApiKey();
     this.client = new OpenAI({
-      apiKey: this.config.openaiApiKey,
+      apiKey: this.config.apiKey,
+      baseURL: this.config.baseUrl,
+      timeout: this.config.timeout || 60000,
     });
 
     // Configure rate limiting based on OpenAI's limits
     this.rateLimitConfig = {
       requestsPerMinute: 3500, // Conservative limit for GPT-4
       tokensPerMinute: 40000, // Conservative token limit
-      maxRetries: 3,
+      maxRetries: this.config.maxRetries || 3,
       retryDelay: 1000, // 1 second base delay
     };
   }
@@ -96,23 +79,26 @@ export class OpenAIClient {
    * Validate the OpenAI API key format and environment
    */
   private validateApiKey(): void {
-    const apiKey = this.config.openaiApiKey || process.env.OPENAI_API_KEY;
+    const apiKey = this.config.apiKey;
     
     if (!apiKey) {
-      throw new OpenAIAuthenticationError(
-        'OpenAI API key is required. Set OPENAI_API_KEY environment variable or provide --openai-key argument.'
+      throw new LLMAuthenticationError(
+        'OpenAI API key is required. Set OPENAI_API_KEY environment variable or provide --openai-key argument.',
+        LLMProvider.OPENAI
       );
     }
 
     if (!apiKey.startsWith('sk-')) {
-      throw new OpenAIAuthenticationError(
-        'Invalid OpenAI API key format. API keys should start with "sk-".'
+      throw new LLMAuthenticationError(
+        'Invalid OpenAI API key format. API keys should start with "sk-".',
+        LLMProvider.OPENAI
       );
     }
 
     if (apiKey.length < 20) {
-      throw new OpenAIAuthenticationError(
-        'OpenAI API key appears to be too short. Please check your API key.'
+      throw new LLMAuthenticationError(
+        'OpenAI API key appears to be too short. Please check your API key.',
+        LLMProvider.OPENAI
       );
     }
   }
@@ -123,10 +109,10 @@ export class OpenAIClient {
   async generateDocumentation(
     prompt: string,
     systemPrompt?: string,
-    preferredModel: OpenAIModel = OpenAIModel.GPT_4
-  ): Promise<OpenAIResponse> {
+    preferredModel?: string
+  ): Promise<LLMResponse> {
     return this.executeWithRetry(async () => {
-      const model = await this.selectModel(preferredModel);
+      const model = await this.selectModel(preferredModel || OpenAIModels.GPT_4);
       
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
@@ -142,8 +128,8 @@ export class OpenAIClient {
       const completion = await this.client.chat.completions.create({
         model,
         messages,
-        temperature: 0.3, // Lower temperature for more consistent documentation
-        max_tokens: 4000, // Reasonable limit for documentation
+        temperature: this.config.temperature || 0.3, // Lower temperature for more consistent documentation
+        max_tokens: this.config.maxTokens || 4000, // Reasonable limit for documentation
         top_p: 0.9,
         frequency_penalty: 0.1,
         presence_penalty: 0.1,
@@ -151,7 +137,7 @@ export class OpenAIClient {
 
       const choice = completion.choices[0];
       if (!choice?.message?.content) {
-        throw new OpenAIClientError('No content received from OpenAI API');
+        throw new LLMClientError('No content received from OpenAI API', undefined, LLMProvider.OPENAI);
       }
 
       // Track token usage
@@ -179,9 +165,9 @@ export class OpenAIClient {
    */
   async generateBatch(
     prompts: Array<{ prompt: string; systemPrompt?: string }>,
-    preferredModel: OpenAIModel = OpenAIModel.GPT_4
-  ): Promise<OpenAIResponse[]> {
-    const results: OpenAIResponse[] = [];
+    preferredModel?: string
+  ): Promise<LLMResponse[]> {
+    const results: LLMResponse[] = [];
     const batchSize = 5; // Process in small batches to avoid overwhelming the API
 
     for (let i = 0; i < prompts.length; i += batchSize) {
@@ -210,11 +196,11 @@ export class OpenAIClient {
   /**
    * Select the best available model with fallback options
    */
-  private async selectModel(preferredModel: OpenAIModel): Promise<string> {
+  private async selectModel(preferredModel: string): Promise<string> {
     const fallbackOrder = [
-      OpenAIModel.GPT_4_TURBO,
-      OpenAIModel.GPT_4,
-      OpenAIModel.GPT_3_5_TURBO,
+      OpenAIModels.GPT_4_TURBO,
+      OpenAIModels.GPT_4,
+      OpenAIModels.GPT_3_5_TURBO,
     ];
 
     // Start with preferred model
@@ -233,7 +219,7 @@ export class OpenAIClient {
       }
     }
 
-    throw new OpenAIClientError('No available OpenAI models found');
+    throw new LLMClientError('No available OpenAI models found', undefined, LLMProvider.OPENAI);
   }
 
   /**
@@ -248,7 +234,7 @@ export class OpenAIClient {
       });
     } catch (error: any) {
       if (error?.status === 404 || error?.code === 'model_not_found') {
-        throw new OpenAIClientError(`Model ${model} not found`);
+        throw new LLMClientError(`Model ${model} not found`, undefined, LLMProvider.OPENAI);
       }
       // Other errors might be temporary, so we'll consider the model available
     }
@@ -341,38 +327,46 @@ export class OpenAIClient {
    * Handle and transform errors
    */
   private handleError(error: any): Error {
-    if (error instanceof OpenAIClientError) {
+    if (error instanceof LLMClientError) {
       return error;
     }
 
     if (error?.status === 401 || error?.status === 403) {
-      return new OpenAIAuthenticationError(
-        'Invalid OpenAI API key or insufficient permissions'
+      return new LLMAuthenticationError(
+        'Invalid OpenAI API key or insufficient permissions',
+        LLMProvider.OPENAI
       );
     }
 
     if (error?.status === 429) {
       const retryAfter = error?.headers?.['retry-after'];
-      return new OpenAIRateLimitError(
+      return new LLMRateLimitError(
         'OpenAI API rate limit exceeded',
-        retryAfter ? parseInt(retryAfter, 10) : undefined
+        retryAfter ? parseInt(retryAfter, 10) : undefined,
+        LLMProvider.OPENAI
       );
     }
 
     if (error?.status === 400) {
-      return new OpenAIClientError(
-        `Invalid request: ${error?.message || 'Bad request'}`
+      return new LLMClientError(
+        `Invalid request: ${error?.message || 'Bad request'}`,
+        'BAD_REQUEST',
+        LLMProvider.OPENAI
       );
     }
 
     if (error?.status >= 500) {
-      return new OpenAIClientError(
-        `OpenAI API server error: ${error?.message || 'Internal server error'}`
+      return new LLMServerError(
+        `OpenAI API server error: ${error?.message || 'Internal server error'}`,
+        error?.status,
+        LLMProvider.OPENAI
       );
     }
 
-    return new OpenAIClientError(
-      `OpenAI API error: ${error?.message || 'Unknown error'}`
+    return new LLMClientError(
+      `OpenAI API error: ${error?.message || 'Unknown error'}`,
+      undefined,
+      LLMProvider.OPENAI
     );
   }
 
@@ -423,7 +417,7 @@ export class OpenAIClient {
   async validateConnection(): Promise<boolean> {
     try {
       await this.client.chat.completions.create({
-        model: OpenAIModel.GPT_3_5_TURBO,
+        model: OpenAIModels.GPT_3_5_TURBO,
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 1,
       });

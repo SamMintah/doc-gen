@@ -1,11 +1,12 @@
 import { ApiSpec, Endpoint } from '../models/types.js';
 import { Config } from '../models/config.js';
-import { OpenAIClient, OpenAIModel, OpenAIResponse } from './client.js';
+import { LLMClient, LLMResponse } from '../llm/interfaces.js';
+import { LLMFactory } from '../llm/factory.js';
 import {
   SYSTEM_PROMPT,
   buildRestEndpointPrompt,
   buildGraphQLPrompt,
-  buildBatchPrompt,
+  
   buildApiOverviewPrompt,
 } from './prompts.js';
 
@@ -65,11 +66,12 @@ export class TokenLimitError extends AIServiceError {
  * Main AI service for orchestrating documentation generation
  */
 export class AIService {
-  private openaiClient: OpenAIClient;
+  private llmClient: LLMClient;
   private batchConfig: BatchConfig;
 
-  constructor(private config: Config) {
-    this.openaiClient = new OpenAIClient(config);
+  constructor(private config: Config, llmClient?: LLMClient) {
+    // Use dependency injection if provided, otherwise create from factory
+    this.llmClient = llmClient || LLMFactory.create(config);
     
     // Configure batching based on model and token limits
     this.batchConfig = {
@@ -91,10 +93,10 @@ export class AIService {
       throw new AIServiceError('API specification is empty or invalid');
     }
 
-    // Validate OpenAI connection before starting
-    const isConnected = await this.openaiClient.validateConnection();
+    // Validate LLM connection before starting
+    const isConnected = await this.llmClient.validateConnection();
     if (!isConnected) {
-      throw new AIServiceError('Unable to connect to OpenAI API. Please check your API key and connection.');
+      throw new AIServiceError('Unable to connect to LLM API. Please check your API key and connection.');
     }
 
     progressCallback?.(0, apiSpec.length, 'Starting documentation generation...');
@@ -121,7 +123,7 @@ export class AIService {
       progressCallback?.(apiSpec.length, apiSpec.length, 'Documentation generation complete!');
 
       if (this.config.verbose) {
-        const tokenUsage = this.openaiClient.getTokenUsage();
+        const tokenUsage = this.llmClient.getTokenUsage();
         console.log(`[AIService] Total tokens used: ${tokenUsage.totalTokens}`);
         console.log(`[AIService] Generated documentation for ${enhancedEndpoints.length} endpoints`);
       }
@@ -141,7 +143,7 @@ export class AIService {
   async generateEndpointDocumentation(endpoint: Endpoint): Promise<EnhancedEndpoint> {
     try {
       const prompt = this.buildPromptForEndpoint(endpoint);
-      const response = await this.openaiClient.generateDocumentation(
+      const response = await this.llmClient.generateDocumentation(
         prompt,
         SYSTEM_PROMPT,
         this.getPreferredModel()
@@ -236,7 +238,7 @@ export class AIService {
         systemPrompt: SYSTEM_PROMPT,
       }));
 
-      const responses = await this.openaiClient.generateBatch(
+      const responses = await this.llmClient.generateBatch(
         prompts,
         this.getPreferredModel()
       );
@@ -324,7 +326,7 @@ export class AIService {
   /**
    * Enhance an endpoint with AI-generated content
    */
-  private enhanceEndpointWithAI(endpoint: Endpoint, response: OpenAIResponse): EnhancedEndpoint {
+  private enhanceEndpointWithAI(endpoint: Endpoint, response: LLMResponse): EnhancedEndpoint {
     // Parse the AI response to extract different sections
     const sections = this.parseAIResponse(response.content);
 
@@ -410,7 +412,7 @@ export class AIService {
   private async generateApiOverview(enhancedEndpoints: EnhancedEndpoint[]): Promise<string> {
     try {
       const prompt = buildApiOverviewPrompt(enhancedEndpoints);
-      const response = await this.openaiClient.generateDocumentation(
+      const response = await this.llmClient.generateDocumentation(
         prompt,
         SYSTEM_PROMPT,
         this.getPreferredModel()
@@ -434,8 +436,8 @@ export class AIService {
    */
   private estimateEndpointTokens(endpoint: Endpoint): number {
     const prompt = this.buildPromptForEndpoint(endpoint);
-    const systemPromptTokens = this.openaiClient.estimateTokenCount(SYSTEM_PROMPT);
-    const userPromptTokens = this.openaiClient.estimateTokenCount(prompt);
+    const systemPromptTokens = this.llmClient.estimateTokenCount(SYSTEM_PROMPT);
+    const userPromptTokens = this.llmClient.estimateTokenCount(prompt);
     const expectedResponseTokens = 1000; // Estimated response size
     
     return systemPromptTokens + userPromptTokens + expectedResponseTokens;
@@ -451,27 +453,16 @@ export class AIService {
   }
 
   /**
-   * Get the preferred OpenAI model based on configuration
+   * Get the preferred model based on configuration
    */
-  private getPreferredModel(): OpenAIModel {
+  private getPreferredModel(): string | undefined {
     if (this.config.model) {
-      switch (this.config.model.toLowerCase()) {
-        case 'gpt-4':
-          return OpenAIModel.GPT_4;
-        case 'gpt-4-turbo':
-          return OpenAIModel.GPT_4_TURBO;
-        case 'gpt-3.5-turbo':
-          return OpenAIModel.GPT_3_5_TURBO;
-        default:
-          if (this.config.verbose) {
-            console.warn(`[AIService] Unknown model ${this.config.model}, using GPT-4`);
-          }
-          return OpenAIModel.GPT_4;
-      }
+      // Return the model string directly - let the provider handle validation
+      return this.config.model;
     }
 
-    // Default to GPT-4 for best quality
-    return OpenAIModel.GPT_4;
+    // Return undefined to let the provider use its default model
+    return undefined;
   }
 
   /**
@@ -485,21 +476,21 @@ export class AIService {
    * Get current token usage statistics
    */
   getTokenUsage() {
-    return this.openaiClient.getTokenUsage();
+    return this.llmClient.getTokenUsage();
   }
 
   /**
    * Reset token usage statistics
    */
   resetTokenUsage(): void {
-    this.openaiClient.resetTokenUsage();
+    this.llmClient.resetTokenUsage();
   }
 
   /**
    * Check if the service is approaching token limits
    */
   isApproachingTokenLimit(): boolean {
-    return this.openaiClient.isApproachingTokenLimit();
+    return this.llmClient.isApproachingTokenLimit();
   }
 
   /**
@@ -507,10 +498,13 @@ export class AIService {
    */
   async validateService(): Promise<boolean> {
     try {
-      return await this.openaiClient.validateConnection();
+      return await this.llmClient.validateConnection();
     } catch (error) {
-      if (this.config.debug) {
-        console.error('[AIService] Service validation failed:', error);
+      // Log the detailed error for better debugging
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error during service validation';
+      console.error(`[AIService] Service validation failed: ${errorMessage}`);
+      if (this.config.debug && error instanceof Error) {
+        console.error('[AIService] Full error stack:', error.stack);
       }
       return false;
     }

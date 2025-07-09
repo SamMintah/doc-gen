@@ -35,7 +35,7 @@ export interface EncryptedApiKey {
   algorithm: string;
   provider: ApiProvider;
   createdAt: number;
-  expiresAt?: number | undefined;
+  expiresAt?: number;
   keyId: string;
 }
 
@@ -564,7 +564,7 @@ export class ApiKeyManager {
       provider: encryptedKey.provider,
       keyId: encryptedKey.keyId,
       createdAt: encryptedKey.createdAt,
-      expiresAt: encryptedKey.expiresAt,
+      expiresAt: encryptedKey.expiresAt !== undefined ? encryptedKey.expiresAt : undefined,
       isValid: !encryptedKey.expiresAt || Date.now() < encryptedKey.expiresAt
     };
   }

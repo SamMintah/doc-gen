@@ -1,4 +1,5 @@
 import { AuthType, SecurityConfig, ValidationConfig, PrivacyLevel, ValidationLevel } from './types.js';
+import { LLMProvider } from '../llm/interfaces.js';
 
 /**
  * Scanning modes supported by the API documentation generator
@@ -60,7 +61,9 @@ export interface Config {
   outputFile: string;
   
   // AI configuration
-  openaiApiKey: string;
+  provider: LLMProvider;
+  providerConfig: Record<string, any>;
+  model?: string;
   
   // Authentication configuration
   authType?: AuthType;
@@ -96,7 +99,9 @@ export interface CliArgs {
   token?: string;
   type?: string;
   out?: string;
-  openaiKey?: string;
+  provider?: string;
+  apiKey?: string | undefined; // Generic API key for the selected provider
+  model?: string;
   authType?: string;
   authHeaderName?: string;
   seedEndpoints?: string;
@@ -189,15 +194,51 @@ export class ConfigBuilder {
   }
 
   /**
-   * Set the OpenAI API key
+   * Set the LLM provider
    */
-  setOpenAiApiKey(apiKey: string): ConfigBuilder {
-    if (!apiKey || apiKey.trim() === '') {
-      throw new ConfigValidationError('OpenAI API key cannot be empty');
+  setProvider(provider: string): ConfigBuilder {
+    if (!Object.values(LLMProvider).includes(provider as LLMProvider)) {
+      throw new ConfigValidationError(
+        `Invalid provider: ${provider}. Must be one of: ${Object.values(LLMProvider).join(', ')}`
+      );
     }
-    this.config.openaiApiKey = apiKey;
+    this.config.provider = provider as LLMProvider;
     return this;
   }
+
+  /**
+   * Set provider-specific configuration
+   */
+  setProviderConfig(providerConfig: Record<string, any>): ConfigBuilder {
+    this.config.providerConfig = { ...this.config.providerConfig, ...providerConfig };
+    return this;
+  }
+
+  /**
+   * Set the model to use
+   */
+  setModel(model: string): ConfigBuilder {
+    this.config.model = model;
+    return this;
+  }
+
+  /**
+   * Set API key for a specific provider
+   */
+  setProviderApiKey(provider: LLMProvider, apiKey: string): ConfigBuilder {
+    if (!apiKey || apiKey.trim() === '') {
+      throw new ConfigValidationError(`${provider} API key cannot be empty`);
+    }
+    
+    if (!this.config.providerConfig) {
+      this.config.providerConfig = {};
+    }
+    
+    this.config.providerConfig.apiKey = apiKey;
+    return this;
+  }
+
+  
 
   /**
    * Set the authentication type
@@ -429,8 +470,21 @@ export class ConfigBuilder {
       builder.setOutputFile(args.out);
     }
 
-    if (args.openaiKey) {
-      builder.setOpenAiApiKey(args.openaiKey);
+    // Provider configuration
+    if (args.provider) {
+      builder.setProvider(args.provider);
+    } else {
+      // Default to OpenAI for backward compatibility
+      builder.setProvider(LLMProvider.OPENAI);
+    }
+
+    // Generic API key for the selected provider
+    if (args.apiKey) {
+      builder.setProviderApiKey(builder.config.provider || LLMProvider.OPENAI, args.apiKey);
+    }
+
+    if (args.model) {
+      builder.setModel(args.model);
     }
 
     // Optional fields
@@ -542,9 +596,22 @@ export class ConfigBuilder {
       throw new ConfigValidationError('Output file is required');
     }
 
-    if (!this.config.openaiApiKey) {
-      throw new ConfigValidationError('OpenAI API key is required');
+    if (!this.config.provider) {
+      throw new ConfigValidationError('LLM provider is required');
     }
+
+    if (!this.config.providerConfig) {
+      throw new ConfigValidationError('Provider configuration is required');
+    }
+
+    // Validate provider-specific API key
+    const apiKey = this.config.providerConfig.apiKey;
+    if (!apiKey || apiKey.trim() === '') {
+      throw new ConfigValidationError(`API key is required for ${this.config.provider} provider`);
+    }
+
+    // Provider-specific validation
+    this.validateProviderSpecificConfig();
 
     // Mode-specific validation
     if (this.config.mode === ScanMode.LIVE) {
@@ -670,6 +737,36 @@ export class ConfigBuilder {
   }
 
   /**
+   * Validate provider-specific configuration
+   */
+  private validateProviderSpecificConfig(): void {
+    const { provider, providerConfig } = this.config;
+    const apiKey = providerConfig?.apiKey;
+
+    switch (provider) {
+      case LLMProvider.OPENAI:
+        // OpenAI API keys typically start with 'sk-'
+        if (apiKey && !apiKey.startsWith('sk-')) {
+          console.warn('OpenAI API key should typically start with "sk-"');
+        }
+        break;
+      case LLMProvider.ANTHROPIC:
+        // Anthropic API keys typically start with 'sk-ant-'
+        if (apiKey && !apiKey.startsWith('sk-ant-')) {
+          console.warn('Anthropic API key should typically start with "sk-ant-"');
+        }
+        break;
+      case LLMProvider.GEMINI:
+        // Google API keys are typically 39 characters long
+        if (apiKey && apiKey.length !== 39) {
+          console.warn('Google API key should typically be 39 characters long');
+        }
+        break;
+      // Add validation for other providers as needed
+    }
+  }
+
+  /**
    * Set default values for optional configuration
    */
   private setDefaults(): void {
@@ -707,6 +804,15 @@ export class ConfigBuilder {
 
     if (this.config.authType === undefined) {
       this.config.authType = AuthType.NONE;
+    }
+
+    // Set provider defaults
+    if (!this.config.provider) {
+      this.config.provider = LLMProvider.OPENAI;
+    }
+
+    if (!this.config.providerConfig) {
+      this.config.providerConfig = {};
     }
 
     // Set defaults for new configuration sections
@@ -825,5 +931,5 @@ export class ConfigBuilder {
     }
   }
 }
-export { SecurityConfig };
+export type { SecurityConfig };
 

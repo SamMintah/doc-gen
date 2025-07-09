@@ -2,8 +2,14 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { ConfigBuilder, CliArgs, ConfigValidationError, ScanMode, ApiType } from '../models/config.js';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { ConfigBuilder } from '../models/config.js';
+import { CliArgs, ConfigValidationError, ScanMode, ApiType } from '../models/config.js';
 import { generateDocumentation, getGenerationSummary, getHealthStatus, formatDuration } from '../core/app.js';
+
+// Load environment variables from .env file
+dotenv.config();
 
 // Package information
 const packageInfo = {
@@ -51,8 +57,17 @@ async function main(): Promise<void> {
       './api-docs.md'
     )
     .option(
-      '--openai-key <key>',
-      'OpenAI API key for AI-powered documentation generation (can also be set via OPENAI_API_KEY environment variable)'
+      '--provider <provider>',
+      'LLM provider: "openai", "anthropic", "gemini", "cohere", or "huggingface"',
+      'openai'
+    )
+    .option(
+      '--api-key <key>',
+      'API key for the selected LLM provider (can also be set via environment variable, e.g., OPENAI_API_KEY for OpenAI)'
+    )
+    .option(
+      '--model <model>',
+      'specific model to use (provider-dependent, e.g., "gpt-4", "claude-3-opus", "gemini-pro")'
     )
     .option(
       '--auth-type <type>',
@@ -120,24 +135,41 @@ async function main(): Promise<void> {
   program.addHelpText('after', `
 
 ${chalk.bold('Examples:')}
-  ${chalk.cyan('# Generate docs for a REST API with bearer token')}
-  $ api-doc-generator --mode live --url https://api.example.com --token your-token --type rest
+  ${chalk.cyan('# Generate docs for a REST API with bearer token (OpenAI)')}
+  $ api-doc-generator --mode live --url https://api.example.com --token your-token --type rest --api-key sk-...
+
+  ${chalk.cyan('# Generate docs using Anthropic Claude')}
+  $ api-doc-generator --url https://api.example.com --provider anthropic --api-key sk-ant-... --model claude-3-opus
+
+  ${chalk.cyan('# Generate docs using Google Gemini')}
+  $ api-doc-generator --url https://api.example.com --provider gemini --api-key your-key --model gemini-pro
 
   ${chalk.cyan('# Generate docs for a GraphQL API')}
-  $ api-doc-generator --mode live --url https://api.example.com/graphql --type graphql
+  $ api-doc-generator --mode live --url https://api.example.com/graphql --type graphql --provider openai --api-key sk-...
 
   ${chalk.cyan('# Generate docs with custom output file and title')}
-  $ api-doc-generator --url https://api.example.com --out ./docs/api.md --title "My API Docs"
+  $ api-doc-generator --url https://api.example.com --out ./docs/api.md --title "My API Docs" --api-key sk-...
 
   ${chalk.cyan('# Generate docs with API key authentication')}
-  $ api-doc-generator --url https://api.example.com --auth-type apiKey --auth-header-name X-API-Key --token your-api-key
+  $ api-doc-generator --url https://api.example.com --auth-type apiKey --auth-header-name X-API-Key --token your-api-key --api-key sk-...
 
   ${chalk.cyan('# Perform health check')}
   $ api-doc-generator --health-check
 
 ${chalk.bold('Environment Variables:')}
-  ${chalk.yellow('OPENAI_API_KEY')}    OpenAI API key (alternative to --openai-key)
-  ${chalk.yellow('DEBUG')}             Enable debug mode (alternative to --debug)
+  ${chalk.yellow('OPENAI_API_KEY')}       API key for OpenAI (alternative to --api-key with --provider openai)
+  ${chalk.yellow('ANTHROPIC_API_KEY')}    API key for Anthropic (alternative to --api-key with --provider anthropic)
+  ${chalk.yellow('GEMINI_API_KEY')}       API key for Google Gemini (alternative to --api-key with --provider gemini)
+  ${chalk.yellow('COHERE_API_KEY')}       API key for Cohere (alternative to --api-key with --provider cohere)
+  ${chalk.yellow('HUGGINGFACE_API_KEY')}  API key for Hugging Face (alternative to --api-key with --provider huggingface)
+  ${chalk.yellow('DEBUG')}                Enable debug mode (alternative to --debug)
+
+${chalk.bold('Supported LLM Providers:')}
+  ${chalk.green('openai')}       OpenAI GPT models (gpt-4, gpt-3.5-turbo, etc.)
+  ${chalk.green('anthropic')}    Anthropic Claude models (claude-3-opus, claude-3-sonnet, etc.)
+  ${chalk.green('gemini')}       Google Gemini models (gemini-pro, gemini-pro-vision, etc.)
+  ${chalk.green('cohere')}       Cohere models (command, command-light, etc.)
+  ${chalk.green('huggingface')}  Hugging Face models (various open-source models)
 
 ${chalk.bold('Supported Authentication Types:')}
   ${chalk.green('none')}      No authentication
@@ -226,8 +258,21 @@ ${chalk.bold('Supported API Types:')}
  * Parse CLI options into CliArgs format
  */
 function parseCliArguments(options: any): CliArgs {
-  // Get OpenAI API key from option or environment variable
-  const openaiKey = options.openaiKey || process.env.OPENAI_API_KEY;
+  // Get API key from option or environment variable based on provider
+  let apiKey: string | undefined;
+  if (options.apiKey) {
+    apiKey = options.apiKey;
+  } else if (options.provider === 'openai' && process.env.OPENAI_API_KEY) {
+    apiKey = process.env.OPENAI_API_KEY;
+  } else if (options.provider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+    apiKey = process.env.ANTHROPIC_API_KEY;
+  } else if (options.provider === 'gemini' && process.env.GEMINI_API_KEY) {
+    apiKey = process.env.GEMINI_API_KEY;
+  } else if (options.provider === 'cohere' && process.env.COHERE_API_KEY) {
+    apiKey = process.env.COHERE_API_KEY;
+  } else if (options.provider === 'huggingface' && process.env.HUGGINGFACE_API_KEY) {
+    apiKey = process.env.HUGGINGFACE_API_KEY;
+  }
   
   // Get debug mode from option or environment variable
   const debug = options.debug || process.env.DEBUG === 'true';
@@ -238,7 +283,9 @@ function parseCliArguments(options: any): CliArgs {
     token: options.token,
     type: options.type,
     out: options.out,
-    openaiKey,
+    provider: options.provider,
+    apiKey,
+    model: options.model,
     authType: options.authType,
     authHeaderName: options.authHeaderName,
     seedEndpoints: options.seedEndpoints,
@@ -268,7 +315,8 @@ async function performHealthCheck(options: any): Promise<void> {
       mode: cliArgs.mode || 'live',
       type: cliArgs.type || 'rest',
       out: cliArgs.out || './test-output.md',
-      openaiKey: cliArgs.openaiKey || 'sk-test', // Dummy key for health check
+      provider: cliArgs.provider || 'openai',
+      apiKey: cliArgs.apiKey || 'sk-test', 
     });
 
     const health = await getHealthStatus(config);
@@ -369,6 +417,7 @@ function handleError(error: unknown, debug: boolean = false): void {
     console.log(chalk.red(error.message));
     console.log();
     console.log(chalk.yellow('💡 Tip: Use --help to see all available options and examples'));
+    console.log(chalk.yellow('💡 Make sure you have provided the correct API key for your selected LLM provider'));
   } else if (error instanceof Error) {
     console.log(chalk.red.bold('❌ Error'));
     console.log(chalk.red(error.message));
@@ -424,11 +473,9 @@ process.on('SIGTERM', () => {
 });
 
 // Run the main function
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    handleError(error, process.env.DEBUG === 'true');
-    process.exit(1);
-  });
-}
+main().catch((error) => {
+  handleError(error, process.env.DEBUG === 'true');
+  process.exit(1);
+});
 
 export { main };
