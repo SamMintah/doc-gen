@@ -27,18 +27,36 @@ npm install -g api-doc-generator
 npx api-doc-generator --help
 ```
 
-### Basic Usage
+### Generating and Serving Documentation
+
+This tool uses a two-step process to generate and serve API documentation:
+
+1.  **Generate Documentation**: This step runs the core CLI tool to scan your API and produce a `demo-docs.md` file.
+2.  **Serve Documentation**: This step copies the generated Markdown into the Slate project and starts a Docker container to serve it locally.
+
+#### Step 1: Generate Documentation
+
+Use the `npm run generate-docs` command, passing your API's URL, desired title, and any other relevant options. The generated Markdown will be saved to `./demo-docs.md`.
 
 ```bash
-# Generate docs for a live REST API (using OpenAI)
-api-doc-generator --mode live --type rest --url https://api.example.com --token your-api-token --provider openai --openai-key your-openai-key
-
-# Scan a GraphQL API (using Anthropic Claude)
-api-doc-generator --mode live --type graphql --url https://api.example.com/graphql --token your-token --provider anthropic --anthropic-key your-anthropic-key
-
-# Analyze code for API endpoints (coming soon)
-api-doc-generator --mode code --path ./src/routes --provider gemini --gemini-key your-gemini-key
+npm run generate-docs -- \
+  --url https://jsonplaceholder.typicode.com \
+  --title "JSONPlaceholder API Docs" \
+  --provider gemini
 ```
+
+#### Step 2: Serve Documentation with Slate
+
+Once `demo-docs.md` is generated, run `npm run serve-docs`. This will prepare the Slate environment and start a local web server.
+
+```bash
+npm run serve-docs
+```
+
+After running this command, open your web browser and navigate to `http://localhost:4567` to view your documentation. The server will automatically refresh in your browser when you re-run `npm run generate-docs` and then refresh the page.
+
+**Note**: The `serve-docs` command will keep running in your terminal. Press `Ctrl+C` to stop the server.
+
 
 ## 📋 Prerequisites
 
