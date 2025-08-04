@@ -15,6 +15,12 @@ A powerful CLI tool that automatically generates comprehensive API documentation
 - 🚀 **Easy to Use**: Simple CLI interface with sensible defaults
 - 🔧 **Extensible**: Modular architecture for adding new scanners, output formats, and LLM providers
 
+
+<img width="2043" height="1174" alt="Macbook-Air-push-api-documentation vercel app" src="https://github.com/user-attachments/assets/80176f0c-ee14-43bd-b250-54b1a235f75e" />
+
+
+
+
 ## 🚀 Quick Start
 
 ### Installation
