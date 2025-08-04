@@ -1,4 +1,4 @@
-import { AuthInfo } from '@/models/types';
+import { AuthInfo } from '../models/types';
 
 /**
  * Interface for HTTP request configuration that can be modified by auth strategies

@@ -147,10 +147,10 @@ api-doc-generator --provider anthropic --anthropic-key sk-ant-your-anthropic-api
 export GEMINI_API_KEY=your-gemini-api-key
 
 # Using CLI option
-api-doc-generator --provider gemini --gemini-key your-gemini-api-key --model gemini-pro
+api-doc-generator --provider gemini --gemini-key your-gemini-api-key --model gemini-1.5-flash-latest
 ```
 
-**Supported Models**: `gemini-pro`, `gemini-pro-vision`
+**Supported Models**: `gemini-1.5-flash-latest`, `gemini-pro-vision`
 
 ### API Authentication Methods
 
@@ -264,7 +264,7 @@ api-doc-generator \
   --api-key-header "X-Company-API-Key" \
   --provider gemini \
   --gemini-key your-gemini-key \
-  --model gemini-pro \
+  --model gemini-1.5-flash-latest \
   --out company-api-docs.md \
   --verbose
 ```

@@ -5,8 +5,8 @@ import chalk from 'chalk';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { ConfigBuilder } from '../models/config.js';
-import { CliArgs, ConfigValidationError, ScanMode, ApiType } from '../models/config.js';
-import { generateDocumentation, getGenerationSummary, getHealthStatus, formatDuration } from '../core/app.js';
+import { CliArgs, ConfigValidationError, ScanMode, ApiType } from '../models/config';
+import { generateDocumentation, getGenerationSummary, getHealthStatus, formatDuration } from '../core/app';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     )
     .option(
       '--model <model>',
-      'specific model to use (provider-dependent, e.g., "gpt-4", "claude-3-opus", "gemini-pro")'
+      'specific model to use (provider-dependent, e.g., "gpt-4", "claude-3-opus", "gemini-1.5-flash-latest")'
     )
     .option(
       '--auth-type <type>',
@@ -142,7 +142,7 @@ ${chalk.bold('Examples:')}
   $ api-doc-generator --url https://api.example.com --provider anthropic --api-key sk-ant-... --model claude-3-opus
 
   ${chalk.cyan('# Generate docs using Google Gemini')}
-  $ api-doc-generator --url https://api.example.com --provider gemini --api-key your-key --model gemini-pro
+  $ api-doc-generator --url https://api.example.com --provider gemini --api-key your-key --model gemini-1.5-flash-latest
 
   ${chalk.cyan('# Generate docs for a GraphQL API')}
   $ api-doc-generator --mode live --url https://api.example.com/graphql --type graphql --provider openai --api-key sk-...
@@ -167,7 +167,7 @@ ${chalk.bold('Environment Variables:')}
 ${chalk.bold('Supported LLM Providers:')}
   ${chalk.green('openai')}       OpenAI GPT models (gpt-4, gpt-3.5-turbo, etc.)
   ${chalk.green('anthropic')}    Anthropic Claude models (claude-3-opus, claude-3-sonnet, etc.)
-  ${chalk.green('gemini')}       Google Gemini models (gemini-pro, gemini-pro-vision, etc.)
+  ${chalk.green('gemini')}       Google Gemini models (gemini-1.5-flash-latest, gemini-pro-vision, etc.)
   ${chalk.green('cohere')}       Cohere models (command, command-light, etc.)
   ${chalk.green('huggingface')}  Hugging Face models (various open-source models)
 

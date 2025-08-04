@@ -1,4 +1,4 @@
-import { ApiSpec } from '@/models/types';
+import { ApiSpec } from '../models/types';
 
 /**
  * Interface that all scanner implementations must implement.

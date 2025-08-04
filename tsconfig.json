@@ -57,6 +57,7 @@
     "test/**/*"
   ],
   "ts-node": {
-    "esm": true
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
   }
 }

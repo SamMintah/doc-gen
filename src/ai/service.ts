@@ -1,7 +1,7 @@
-import { ApiSpec, Endpoint } from '../models/types.js';
-import { Config } from '../models/config.js';
-import { LLMClient, LLMResponse } from '../llm/interfaces.js';
-import { LLMFactory } from '../llm/factory.js';
+import { ApiSpec, Endpoint } from '../models/types';
+import { Config } from '../models/config';
+import { LLMClient, LLMResponse } from '../llm/interfaces';
+import { LLMFactory } from '../llm/factory';
 import {
   SYSTEM_PROMPT,
   buildRestEndpointPrompt,

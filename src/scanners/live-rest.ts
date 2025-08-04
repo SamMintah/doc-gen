@@ -1,8 +1,8 @@
-import { IScanner } from '@/interfaces/scanner';
-import { ApiSpec, Endpoint, HttpMethod, AuthType, AuthInfo, HeaderSpec } from '@/models/types';
-import { Config } from '@/models/config';
-import { createAuthStrategy } from '@/auth/factory';
-import { HttpClient, createHttpClient, discoverEndpoints, extractEndpointsFromSpec, testEndpoint } from '@/utils/http';
+import { IScanner } from '../interfaces/scanner';
+import { ApiSpec, Endpoint, HttpMethod, AuthType, AuthInfo, HeaderSpec } from '../models/types';
+import { Config } from '../models/config';
+import { createAuthStrategy } from '../auth/factory';
+import { HttpClient, createHttpClient, discoverEndpoints, extractEndpointsFromSpec, testEndpoint } from '../utils/http';
 
 /**
  * Scanner for live REST APIs that discovers endpoints through various strategies
@@ -154,6 +154,46 @@ export class LiveRestScanner implements IScanner {
       '/items',
       '/products',
       '/data',
+      '/admin',
+      '/auth',
+      '/login',
+      '/register',
+      '/settings',
+      '/profile',
+      '/orders',
+      '/posts',
+      '/comments',
+      '/categories',
+      '/tags',
+      '/files',
+      '/uploads',
+      '/healthz',
+      '/metrics',
+      '/info',
+      '/docs',
+      '/swagger',
+      '/openapi',
+      '/graphql',
+      '/graphql-playground',
+      '/api/auth',
+      '/api/v1/users',
+      '/api/v1/products',
+      '/api/v1/orders',
+      '/api/v1/posts',
+      '/api/v1/comments',
+      '/api/v1/categories',
+      '/api/v1/tags',
+      '/api/v1/files',
+      '/api/v1/uploads',
+      '/api/v2/users',
+      '/api/v2/products',
+      '/api/v2/orders',
+      '/api/v2/posts',
+      '/api/v2/comments',
+      '/api/v2/categories',
+      '/api/v2/tags',
+      '/api/v2/files',
+      '/api/v2/uploads',
     ];
 
     console.log('Attempting to discover common endpoints...');

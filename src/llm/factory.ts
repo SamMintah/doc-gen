@@ -15,7 +15,7 @@ import { AnthropicProvider, AnthropicConfig } from './providers/anthropic.js';
 const DEFAULT_MODELS = {
   [LLMProvider.OPENAI]: 'gpt-4-turbo-preview',
   [LLMProvider.ANTHROPIC]: 'claude-3-sonnet-20240229',
-  [LLMProvider.GEMINI]: 'gemini-pro',
+  [LLMProvider.GEMINI]: 'gemini-1.5-flash-latest',
   [LLMProvider.COHERE]: 'command-r-plus',
   [LLMProvider.HUGGINGFACE]: 'meta-llama/Llama-2-70b-chat-hf',
 } as const;

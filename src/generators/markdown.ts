@@ -1,4 +1,4 @@
-import { Endpoint, ApiSpec, HttpMethod, AuthType } from '@/models/types';
+import { Endpoint, ApiSpec, HttpMethod, AuthType } from '../models/types';
 
 /**
  * Generates Slate-compatible Markdown documentation from API specifications
@@ -6,7 +6,7 @@ import { Endpoint, ApiSpec, HttpMethod, AuthType } from '@/models/types';
 export class MarkdownGenerator {
   private apiTitle: string;
   private apiVersion: string;
-  private baseUrl?: string;
+  private baseUrl: string | undefined;
 
   constructor(options: {
     title?: string;
@@ -23,6 +23,9 @@ export class MarkdownGenerator {
    */
   public generate(apiSpec: ApiSpec): string {
     const sections: string[] = [];
+
+    // Add frontmatter
+    sections.push(this.generateFrontmatter());
 
     // Add title and introduction
     sections.push(this.generateHeader());
@@ -42,6 +45,24 @@ export class MarkdownGenerator {
     sections.push(this.generateErrorsSection());
 
     return sections.join('\n\n');
+  }
+
+  /**
+   * Generates the Slate frontmatter
+   */
+  private generateFrontmatter(): string {
+    return `---
+title: ${this.apiTitle}
+language_tabs:
+  - shell: Shell
+  - javascript: JavaScript
+  - python: Python
+toc_footers:
+  - <a href='https://github.com/traycerai/api-doc-generator'>Documentation Powered by Gemini CLI</a>
+includes: []
+search: true
+theme: dark
+---`;
   }
 
   /**

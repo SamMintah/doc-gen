@@ -3,25 +3,38 @@
   "version": "1.1.0",
   "description": "AI-powered CLI tool for generating comprehensive API documentation from live APIs and code with support for multiple LLM providers (OpenAI, Anthropic, Google Gemini)",
   "type": "module",
-  "main": "dist/cli/index.js",
+  "main": "dist/index.js",
   "bin": {
     "api-doc-generator": "dist/cli/index.js"
   },
-  "scripts": {
-    "dev": "ts-node --esm src/cli/index.ts",
-    "build": "tsup",
-    "start": "node dist/cli/index.js",
-    "link": "npm run build && npm link",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
-    "format": "prettier --write src/**/*.ts",
-    "format:check": "prettier --check src/**/*.ts",
-    "typecheck": "tsc --noEmit",
-    "prepare": "npm run build"
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli/index.js"
+    }
   },
+"scripts": {
+  "dev": "ts-node --esm src/cli/index.ts",
+  "build": "tsup",
+  "start": "node dist/cli/index.js",
+  "link": "npm run build && npm link",
+  "test": "vitest",
+  "test:watch": "vitest --watch",
+  "test:coverage": "vitest --coverage",
+  "stop-docs": "docker stop slate",
+  "lint": "eslint src --ext .ts",
+  "lint:fix": "eslint src --ext .ts --fix",
+  "format": "prettier --write src/**/*.ts",
+  "format:check": "prettier --check src/**/*.ts",
+  "typecheck": "tsc --noEmit",
+  "prepare": "npm run build",
+  "serve-docs": "cp demo-docs.md slate-docs/source/index.html.md",
+  "generate-docs": "node dist/cli/index.js --mode live --type rest --out ./demo-docs.md --title \"API Documentation\" --provider gemini $@",
+  "cleanup-docs": "docker rm -f slate > /dev/null 2>&1 || true && docker image prune -f > /dev/null 2>&1 || true"
+},
   "keywords": [
     "api",
     "documentation",
@@ -89,3 +102,4 @@
   },
   "homepage": "https://github.com/traycerai/api-doc-generator#readme"
 }
+

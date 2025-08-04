@@ -1,5 +1,5 @@
-import { Config, ScanMode, ApiType } from '@/models/config';
-import { IScanner } from '@/interfaces/scanner';
+import { Config, ScanMode, ApiType } from '../models/config';
+import { IScanner } from '../interfaces/scanner';
 import { LiveRestScanner } from './live-rest';
 import { GraphQLScanner } from './graphql';
 
